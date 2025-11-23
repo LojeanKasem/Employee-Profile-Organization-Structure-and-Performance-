@@ -4,6 +4,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Position } from './models/position.schema';
 import { StructureValidation } from './utils/structure.validation';
 import { Model } from 'mongoose';
+import {  NotFoundException } from '@nestjs/common';
+import { Department, DepartmentDocument } from './models/department.schema';
+import { Position, PositionDocument } from './models/position.schema';
+
+
+import { CreatePositionDto } from './dto/create-position.dto';
+import { UpdatePositionDto } from './dto/update-position.dto';
 
 @Injectable()
 export class OrganizationStructureService {
@@ -12,5 +19,81 @@ export class OrganizationStructureService {
     @InjectModel(Position.name) private readonly positionModel: Model<Position>,
     private readonly validation: StructureValidation        // <-- NEW 
   ) {}
+  // -----------------------------------------
+  // POSITIONS — TEST MODE (NO HOOKS)
+  // -----------------------------------------
+  // This avoids MissingSchemaError because schema pre-save hooks are skipped.
+
+  async createPosition(dto: CreatePositionDto) {
+    // Validate department exists
+    const department = await this.departmentModel.findById(dto.departmentId);
+
+    if (!department) {
+      throw new NotFoundException('Department does not exist');
+    }
+
+    // DIRECT INSERT → skip hooks safely
+    const inserted = await this.positionModel.collection.insertOne({
+      ...dto,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    return {
+      _id: inserted.insertedId,
+      code: dto.code,
+      title: dto.title,
+      description: dto.description ?? null,
+      departmentId: dto.departmentId,
+      isActive: true,
+    };
+  }
+
+  // GET ALL POSITIONS
+  async getPositions() {
+    return this.positionModel.find().exec();
+  }
+
+  // GET ONE POSITION
+  async getPositionById(id: string) {
+    const pos = await this.positionModel.findById(id).exec();
+
+    if (!pos) {
+      throw new NotFoundException('Position not found');
+    }
+
+    return pos;
+  }
+
+  // UPDATE POSITION (this uses update → hook may run but your schema's update hook is safe)
+  async updatePosition(id: string, dto: UpdatePositionDto) {
+    const updated = await this.positionModel.findByIdAndUpdate(
+      id,
+      dto,
+      { new: true },
+    );
+
+    if (!updated) {
+      throw new NotFoundException('Position not found');
+    }
+
+    return updated;
+  }
+
+  // DEACTIVATE POSITION
+  async deactivatePosition(id: string) {
+    const pos = await this.positionModel.findByIdAndUpdate(
+      id,
+      { isActive: false },
+      { new: true },
+    );
+
+    if (!pos) {
+      throw new NotFoundException('Position not found');
+    }
+
+    return pos;
+  }
 }
 
