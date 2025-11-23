@@ -1,10 +1,25 @@
-import { Controller, Get, Param } from '@nestjs/common'
+
 import { HierarchyService } from './hierarchy/hierarchy.service';
 import { OrganizationStructureService } from './organization-structure.service';
+import { 
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Body,
+  Param 
+} from '@nestjs/common';
+
+
+import { CreatePositionDto } from './dto/create-position.dto';
+import { UpdatePositionDto } from './dto/update-position.dto';
+
+  
 
 @Controller('organization-structure')
 export class OrganizationStructureController {
   constructor(
+    private readonly orgService: OrganizationStructureService ,
     private readonly organizationStructureService: OrganizationStructureService,
     private readonly hierarchyService: HierarchyService,
   ) {}
@@ -30,4 +45,35 @@ export class OrganizationStructureController {
       return error;
     }
   }
+  // -----------------------------------------
+// POSITIONS
+// -----------------------------------------
+
+@Post('positions')
+createPosition(@Body() dto: CreatePositionDto) {
+  return this.orgService.createPosition(dto);
+}
+
+@Get('positions')
+getPositions() {
+  return this.orgService.getPositions();
+}
+
+@Get('positions/:id')
+getPosition(@Param('id') id: string) {
+  return this.orgService.getPositionById(id);
+}
+
+@Patch('positions/:id')
+updatePosition(
+  @Param('id') id: string,
+  @Body() dto: UpdatePositionDto,
+) {
+  return this.orgService.updatePosition(id, dto);
+}
+
+@Patch('positions/:id/deactivate')
+deactivatePosition(@Param('id') id: string) {
+  return this.orgService.deactivatePosition(id);
+}
 }
