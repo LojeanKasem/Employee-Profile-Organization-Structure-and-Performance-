@@ -1,7 +1,15 @@
-import { Controller, Get, Param } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { HierarchyService } from './hierarchy/hierarchy.service';
 import { OrganizationStructureService } from './organization-structure.service';
-
+import { CreateDepartmentDto } from './dto/create-department.dto';
+import { UpdateDepartmentDto } from './dto/update-department.dto';
 @Controller('organization-structure')
 export class OrganizationStructureController {
   constructor(
@@ -30,4 +38,37 @@ export class OrganizationStructureController {
       return error;
     }
   }
+    // CREATE DEPARTMENT
+  @Post('departments')
+  createDepartment(@Body() dto: CreateDepartmentDto) {
+    return this.orgService.createDepartment(dto);
+  }
+
+  // GET ALL
+  @Get('departments')
+  getAllDepartments() {
+    return this.orgService.getAllDepartments();
+  }
+
+  // GET SINGLE
+  @Get('departments/:id')
+  getDepartment(@Param('id') id: string) {
+    return this.orgService.getDepartmentById(id);
+  }
+
+  // UPDATE
+  @Patch('departments/:id')
+  updateDepartment(
+    @Param('id') id: string,
+    @Body() dto: UpdateDepartmentDto,
+  ) {
+    return this.orgService.updateDepartment(id, dto);
+  }
+
+  // DEACTIVATE
+  @Patch('departments/deactivate/:id')
+  deactivateDepartment(@Param('id') id: string) {
+    return this.orgService.deactivateDepartment(id);
+  }
+
 }
