@@ -7,11 +7,12 @@ import { Model } from 'mongoose';
 import {  NotFoundException } from '@nestjs/common';
 import { Department, DepartmentDocument } from './models/department.schema';
 import { Position, PositionDocument } from './models/position.schema';
-
+import { BadRequestException,} from '@nestjs/common';
 
 import { CreatePositionDto } from './dto/create-position.dto';
 import { UpdatePositionDto } from './dto/update-position.dto';
-
+import { CreateDepartmentDto } from './dto/create-department.dto';
+import { UpdateDepartmentDto } from './dto/update-department.dto';
 @Injectable()
 export class OrganizationStructureService {
   constructor(
@@ -94,6 +95,54 @@ export class OrganizationStructureService {
     }
 
     return pos;
+  }
+    // CREATE
+  async createDepartment(dto: CreateDepartmentDto) {
+    const exists = await this.departmentModel.findOne({ code: dto.code });
+    if (exists) {
+      throw new BadRequestException('Department code must be unique');
+    }
+
+    const department = new this.departmentModel(dto);
+    return department.save();
+  }
+
+  // GET ALL
+  async getAllDepartments() {
+    return this.departmentModel.find();
+  }
+
+  // GET ONE
+  async getDepartmentById(id: string) {
+    const dep = await this.departmentModel.findById(id);
+    if (!dep) {
+      throw new NotFoundException('Department not found');
+    }
+    return dep;
+  }
+
+  // UPDATE
+  async updateDepartment(id: string, dto: UpdateDepartmentDto) {
+    const updated = await this.departmentModel.findByIdAndUpdate(
+      id,
+      dto,
+      { new: true },
+    );
+    if (!updated) {
+      throw new NotFoundException('Department not found');
+    }
+    return updated;
+  }
+
+  // DEACTIVATE
+  async deactivateDepartment(id: string) {
+    const dep = await this.departmentModel.findById(id);
+    if (!dep) {
+      throw new NotFoundException('Department not found');
+    }
+
+    dep.isActive = false;
+    return dep.save();
   }
 }
 
