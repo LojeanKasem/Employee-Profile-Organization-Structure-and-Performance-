@@ -31,9 +31,7 @@ import {
       { name: Position.name, schema: PositionSchema },
       { name: PositionAssignment.name, schema: PositionAssignmentSchema },
       { name: StructureApproval.name, schema: StructureApprovalSchema },
-      { name: StructureChangeLog.name, schema: StructureChangeLogSchema },
-      { name: Department.name, schema: DepartmentSchema },
-      { name: Position.name, schema: PositionSchema }
+      { name: StructureChangeLog.name, schema: StructureChangeLogSchema }
       
       ,{
         name: StructureChangeRequest.name,
