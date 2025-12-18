@@ -4,8 +4,8 @@ import { OrganizationStructureController } from './organization-structure.contro
 import { OrganizationStructureService } from './organization-structure.service';
 import { Department, DepartmentSchema } from './models/department.schema';
 import { Position, PositionSchema } from './models/position.schema';
-import { HierarchyService } from './hierarchy/hierarchy.service'; // 👈 NEW
-import { StructureValidation } from './utils/structure.validation'; //new 
+import { HierarchyService } from './hierarchy/hierarchy.service'; 
+import { StructureValidation } from './utils/structure.validation'; 
 
 import {
   PositionAssignment,
@@ -41,8 +41,8 @@ import {
   ],
   controllers: [OrganizationStructureController],
   providers: [OrganizationStructureService,
-      HierarchyService, // 👈 NEW
-      StructureValidation,     // ⭐ NEW
+      HierarchyService, 
+      StructureValidation,
   ],
 
 exports: [

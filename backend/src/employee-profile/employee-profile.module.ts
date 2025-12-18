@@ -22,7 +22,6 @@ import {
 
 @Module({
   imports: [
-
     MongooseModule.forFeature([
       { name: Candidate.name, schema: CandidateSchema },
       { name: EmployeeProfile.name, schema: EmployeeProfileSchema },
@@ -36,5 +35,9 @@ import {
   ],
   controllers: [EmployeeProfileController],
   providers: [EmployeeProfileService],
+  exports: [
+    EmployeeProfileService, // ✅ REQUIRED
+    MongooseModule,
+  ],
 })
 export class EmployeeProfileModule {}

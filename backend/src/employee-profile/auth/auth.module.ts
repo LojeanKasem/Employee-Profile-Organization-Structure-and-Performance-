@@ -5,8 +5,8 @@ import { EmployeeProfile, EmployeeProfileSchema } from '../models/employee-profi
 import { AuthService } from './auth.service';
 import { EmployeeProfileController } from './auth.controller';
 import { EmployeeSystemRole, EmployeeSystemRoleSchema } from '../models/employee-system-role.schema';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 
 @Module({
   imports: [
@@ -17,9 +17,10 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 
     // Register JWT
     JwtModule.register({
-  secret: process.env.JWT_SECRET || 'SUPER_SECRET_KEY_CHANGE_THIS',
-  signOptions: { expiresIn: '2h' },
+  secret: process.env.JWT_SECRET || 'super-secret-key',
+  signOptions: { expiresIn: '1d' },
 })
+
   ],
   controllers: [EmployeeProfileController], // ✅ must be the real controller class
   providers: [AuthService,  RolesGuard],

@@ -5,9 +5,14 @@ import {
   EmployeeStatus,
   WorkType,
 } from '../enums/employee-profile.enums';
-
+import { AppraisalRatingScaleType } from '../../performance/enums/performance.enums';
+import { Department } from '../../organization-structure/models/department.schema';
+import { Position } from '../../organization-structure/models/position.schema';
+import { AppraisalCycle } from '../../performance/models/appraisal-cycle.schema';
+import { AppraisalRecord } from '../../performance/models/appraisal-record.schema';
+import { AppraisalTemplate } from '../../performance/models/appraisal-template.schema';
+import { payGrade } from '../../payroll-configuration/models/payGrades.schema';
 import { UserProfileBase } from './user-schema';
-import { payGrade } from 'src/payroll-configuration/models/payGrades.schema';
 
 export type EmployeeProfileDocument = HydratedDocument<EmployeeProfile>;
 
@@ -20,6 +25,8 @@ export class EmployeeProfile extends UserProfileBase {
   @Prop({ type: Date, required: true })
   dateOfHire: Date;
 
+  
+
   @Prop({ type: String })
   workEmail?: string;
 
@@ -31,6 +38,13 @@ export class EmployeeProfile extends UserProfileBase {
 
   @Prop({ type: Date })
   contractEndDate?: Date;
+
+  // Banking details
+  @Prop({ type: String })
+  bankName?: string;
+
+  @Prop({ type: String })
+  bankAccountNumber?: string;
 
   
   @Prop({
@@ -89,8 +103,11 @@ export class EmployeeProfile extends UserProfileBase {
   @Prop({ type: String })
   lastAppraisalRatingLabel?: string;
 
-  @Prop({ type: String })
-  lastAppraisalScaleType?: string;
+  @Prop({
+    type: String,
+    enum: Object.values(AppraisalRatingScaleType),
+  })
+  lastAppraisalScaleType?: AppraisalRatingScaleType;
 
   @Prop({ type: String })
   lastDevelopmentPlanSummary?: string;

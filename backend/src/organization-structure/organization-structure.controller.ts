@@ -1,142 +1,177 @@
+
 import {
-  Controller,
-  Post,
-  Get,
-  Patch,
-  Param,
   Body,
-  Delete,
-  UseGuards,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
 } from '@nestjs/common';
-
+import { HierarchyService } from './hierarchy/hierarchy.service';
 import { OrganizationStructureService } from './organization-structure.service';
-
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
+
 import { CreatePositionDto } from './dto/create-position.dto';
 import { UpdatePositionDto } from './dto/update-position.dto';
 import { SetReportingLineDto } from './dto/set-reporting-line.dto';
 
-// Guards + Roles
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { HR_ROLES, ADMIN_ROLES } from '../common/constants/role-groups';
+  
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 @Controller('organization-structure')
 export class OrganizationStructureController {
-  constructor(private readonly service: OrganizationStructureService) {}
+  constructor(
+    private readonly orgService: OrganizationStructureService ,
+    private readonly organizationStructureService: OrganizationStructureService,
+    private readonly hierarchyService: HierarchyService,
+  ) {}
 
-  // ========================================================================
-  // DEPARTMENTS
-  // ========================================================================
+  // 🔹 Full org hierarchy (all departments + trees of positions)
+  @Get('hierarchy')
+  getOrganizationHierarchy() {
+    return this.hierarchyService.getOrgHierarchy();
+  }
 
+  // 🔹 Hierarchy for a single position (that position as a node + its children)
+  @Get('positions/:id/hierarchy')
+  getPositionHierarchy(@Param('id') id: string) {
+    return this.hierarchyService.getPositionHierarchy(id);
+  }
+  // 🔥 TEMPORARY VALIDATION TEST ENDPOINT
+  @Get('validation/test/:id')
+  async testValidation(@Param('id') id: string) {
+    try {
+      const result = await this.hierarchyService['validation']?.validateObjectId(id); // just a quick test
+      return { message: "VALID OBJECT ID", id };
+    } catch (error) {
+      return error;
+    }
+  }
+
+    // CREATE DEPARTMENT
   @Post('departments')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
   createDepartment(@Body() dto: CreateDepartmentDto) {
-    return this.service.createDepartment(dto);
+    return this.orgService.createDepartment(dto);
   }
 
+  // GET ALL
   @Get('departments')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  getDepartments() {
-    return this.service.getAllDepartments();
+  getAllDepartments() {
+    return this.orgService.getAllDepartments();
   }
 
+  // GET SINGLE
   @Get('departments/:id')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
   getDepartment(@Param('id') id: string) {
-    return this.service.getDepartmentById(id);
+    return this.orgService.getDepartmentById(id);
   }
 
+  // UPDATE
   @Patch('departments/:id')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  updateDepartment(@Param('id') id: string, @Body() dto: UpdateDepartmentDto) {
-    return this.service.updateDepartment(id, dto);
+  updateDepartment(
+    @Param('id') id: string,
+    @Body() dto: UpdateDepartmentDto,
+  ) {
+    return this.orgService.updateDepartment(id, dto);
   }
 
-  @Delete('departments/:id')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
+  // DEACTIVATE
+  @Patch('departments/deactivate/:id')
   deactivateDepartment(@Param('id') id: string) {
-    return this.service.deactivateDepartment(id);
+    return this.orgService.deactivateDepartment(id);
   }
-
-  @Patch('departments/:id/activate')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  activateDepartment(@Param('id') id: string) {
-    return this.service.activateDepartment(id);
-  }
-
-  // ========================================================================
-  // POSITIONS
-  // ========================================================================
-
-  @Post('positions')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  createPosition(@Body() dto: CreatePositionDto) {
-    return this.service.createPosition(dto);
-  }
-
-  @Get('positions')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  getPositions() {
-    return this.service.getPositions();
-  }
-
-  @Get('positions/:id')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  getPosition(@Param('id') id: string) {
-    return this.service.getPositionById(id);
-  }
-
-  @Patch('positions/:id')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  updatePosition(@Param('id') id: string, @Body() dto: UpdatePositionDto) {
-    return this.service.updatePosition(id, dto);
-  }
-
-  @Delete('positions/:id')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  deactivatePosition(@Param('id') id: string) {
-    return this.service.deactivatePosition(id);
-  }
-
-  @Patch('positions/:id/activate')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  activatePosition(@Param('id') id: string) {
-    return this.service.activatePosition(id);
-  }
-
-  // ========================================================================
-  // REPORTING LINES
-  // ========================================================================
-
-  @Patch('positions/:id/report-to')
-@Roles(...HR_ROLES, ...ADMIN_ROLES)
-setReportingLine(
-  @Param('id') id: string,
-  @Body() dto: SetReportingLineDto,
-) {
-  return this.service.setReportingLine(id, dto.reportsToPositionId);
+  @Patch('departments/activate/:id')
+activateDepartment(@Param('id') id: string) {
+  return this.orgService.activateDepartment(id);
 }
 
+  // -----------------------------------------
+// POSITIONS
+// -----------------------------------------
 
-  @Patch('positions/:id/remove-report-to')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  removeReportingLine(@Param('id') id: string) {
-    return this.service.removeReportingLine(id);
-  }
+@Post('positions')
+createPosition(@Body() dto: CreatePositionDto) {
+  return this.orgService.createPosition(dto);
+}
 
-  @Get('positions/:id/manager')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  getManagerOfPosition(@Param('id') id: string) {
-    return this.service.getManagerOfPosition(id);
-  }
+@Get('positions')
+getPositions() {
+  return this.orgService.getPositions();
+}
 
-  @Get('departments/:id/positions')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  getPositionsInDepartment(@Param('id') id: string) {
-    return this.service.getPositionsInDepartment(id);
-  }
+@Get('positions/:id')
+getPosition(@Param('id') id: string) {
+  return this.orgService.getPositionById(id);
+}
+
+@Patch('positions/:id')
+updatePosition(
+  @Param('id') id: string,
+  @Body() dto: UpdatePositionDto,
+) {
+  return this.orgService.updatePosition(id, dto);
+}
+
+@Patch('positions/:id/deactivate')
+deactivatePosition(@Param('id') id: string) {
+  return this.orgService.deactivatePosition(id);
+}
+@Patch('positions/activate/:id')
+activatePosition(@Param('id') id: string) {
+  return this.orgService.activatePosition(id);
+}
+// -------------------------------
+// SET REPORTING LINE
+@Patch('positions/:id/report-to')
+setReportingLine(
+  @Param('id') id: string,
+  @Body('reportsToPositionId') reportsToPositionId: string,
+) {
+  return this.orgService.setReportingLine(id, reportsToPositionId);
+}
+
+// -------------------------------
+// REMOVE REPORTING LINE
+// -------------------------------
+@Patch('positions/:id/remove-report-to')
+removeReportingLine(@Param('id') id: string) {
+  return this.orgService.removeReportingLine(id);
+}
+// GET MANAGER OF A POSITION
+@Get('positions/:id/manager')
+async getManager(@Param('id') id: string) {
+  return this.orgService.getManagerOfPosition(id);
+}
+// GET ALL POSITIONS IN A DEPARTMENT
+@Get('departments/:id/positions')
+getPositionsInDepartment(@Param('id') id: string) {
+  return this.orgService.getPositionsInDepartment(id);
+}
+// -----------------------------
+// VALIDATION ENDPOINTS
+// -----------------------------
+
+// Validate Department
+@Get('validate/department/:id')
+validateDepartment(@Param('id') id: string) {
+  return this.orgService.validateDepartment(id);
+}
+
+// Validate Position
+@Get('validate/position/:id')
+validatePosition(@Param('id') id: string) {
+  return this.orgService.validatePosition(id);
+}
+
+// Validate Reporting Line (source → target)
+@Get('validate/reporting-line')
+validateReportingLine(
+  @Query('source') sourceId: string,
+  @Query('target') targetId: string,
+) {
+  return this.orgService.validateReportingLine(sourceId, targetId);
+}
+
 }
