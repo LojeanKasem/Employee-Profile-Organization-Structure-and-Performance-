@@ -1128,10 +1128,9 @@ export default function Dashboard() {
     }
   }
 
-  function handleLogout() {
-    localStorage.clear();
-    router.push("/login");
-  }
+  function goBackToModules() {
+  router.push("/");
+}
 
   if (loading) {
     return (
@@ -3010,14 +3009,12 @@ hr
       </div>
 
       {/* ================= LOGOUT ================= */}
-        <div className="mt-8 flex justify-end">
         <button
-          onClick={handleLogout}
-            className="px-6 py-2.5 rounded-lg bg-red-600/90 hover:bg-red-600 text-white font-medium transition-all shadow-lg hover:shadow-red-500/20"
-        >
-          Logout
-        </button>
-        </div>
+  onClick={goBackToModules}
+  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-xl"
+>
+  Back to Modules
+</button>
       </div>
     </div>
   );

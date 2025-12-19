@@ -23,12 +23,10 @@ export class EmployeeProfileController {
   }
   
 @Post('register')
-
 register(@Body() dto: RegisterDto) {
   return this.authService.register(dto);
 }
-@Put(':id/roles')
-@Roles( ...ADMIN_ROLES)
+
 async updateRoles(
   @Param('id') id: string,
   @Body('roles') roles: string[],
