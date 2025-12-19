@@ -278,6 +278,9 @@ export class EmployeeProfileService {
   async update(id: string, updateDto: UpdateEmployeeDto) {
     const payload: any = { ...updateDto };
 
+    // Remove roles from payload - they're handled separately
+    delete payload.roles;
+
     if (updateDto.dateOfHire) {
       payload.dateOfHire = new Date(updateDto.dateOfHire);
     }
@@ -294,6 +297,11 @@ export class EmployeeProfileService {
 
     if (!updated) {
       throw new NotFoundException('Employee not found');
+    }
+
+    // Update roles if provided
+    if (updateDto.roles && Array.isArray(updateDto.roles) && updateDto.roles.length > 0) {
+      await this.updateRoles(id, updateDto);
     }
 
     return updated;
@@ -330,6 +338,7 @@ export class EmployeeProfileService {
     'workEmail',
     'biography',
     'address',
+    'profilePictureUrl',
   ];
 
   const payload: any = {};
@@ -482,12 +491,40 @@ export class EmployeeProfileService {
   }
 
  async getTeamSummaryForManager(managerId: string) {
-  return this.employeeModel
-    .find({ supervisorPositionId: managerId })
+  // First, get the manager's profile to find their primaryPositionId
+  const manager = await this.employeeModel.findById(managerId);
+  if (!manager) {
+    throw new NotFoundException('Manager profile not found');
+  }
+
+  if (!manager.primaryPositionId) {
+    // Manager has no position assigned, return empty array
+    return [];
+  }
+
+  // Ensure managerPositionId is a proper ObjectId
+  let managerPositionId: Types.ObjectId;
+  if (manager.primaryPositionId instanceof Types.ObjectId) {
+    managerPositionId = manager.primaryPositionId;
+  } else {
+    const positionIdStr = String(manager.primaryPositionId);
+    managerPositionId = new Types.ObjectId(positionIdStr);
+  }
+
+  // Find all employees where supervisorPositionId matches the manager's primaryPositionId
+  // EXCLUDE the manager themselves (they shouldn't be in their own team list)
+  // Use $in to handle both ObjectId and string comparisons
+  const team = await this.employeeModel
+    .find({ 
+      supervisorPositionId: { $in: [managerPositionId, managerPositionId.toString()] },
+      _id: { $ne: new Types.ObjectId(managerId) } // Exclude the manager from their own team
+    })
     .populate('primaryDepartmentId', 'name')
     .populate('primaryPositionId', 'title name')
-    .select('firstName lastName employeeNumber status dateOfHire primaryDepartmentId primaryPositionId')
+    .select('firstName lastName employeeNumber status dateOfHire primaryDepartmentId primaryPositionId supervisorPositionId')
     .lean();
+
+  return team;
 }
 
   async getTeamEmployeeSummary(managerId: string, employeeId: string) {
@@ -617,11 +654,50 @@ export class EmployeeProfileService {
       throw new BadRequestException('Invalid managerId');
     }
 
-    return this.employeeModel.findByIdAndUpdate(
+    // Prevent self-assignment
+    if (employeeId === managerId) {
+      throw new BadRequestException('An employee cannot be assigned as their own manager');
+    }
+
+    // Get the manager's profile to find their primaryPositionId
+    const manager = await this.employeeModel.findById(managerId);
+    if (!manager) {
+      throw new NotFoundException('Manager not found');
+    }
+
+    if (!manager.primaryPositionId) {
+      throw new BadRequestException('Manager does not have a position assigned. Please assign a position to the manager first.');
+    }
+
+    // Get the employee to verify they exist
+    const employee = await this.employeeModel.findById(employeeId);
+    if (!employee) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    // Convert manager's primaryPositionId to ObjectId if needed
+    const managerPositionId = manager.primaryPositionId instanceof Types.ObjectId 
+      ? manager.primaryPositionId 
+      : new Types.ObjectId(manager.primaryPositionId);
+
+    // Set the employee's supervisorPositionId to the manager's primaryPositionId
+    const updated = await this.employeeModel.findByIdAndUpdate(
       employeeId,
-      { supervisorPositionId: managerId },
+      { supervisorPositionId: managerPositionId },
       { new: true },
     );
+
+    // Verify the assignment was successful
+    const verifyEmployee = await this.employeeModel.findById(employeeId);
+    const assignmentSuccess = verifyEmployee?.supervisorPositionId?.toString() === managerPositionId.toString();
+
+    return {
+      message: `Employee ${employee.firstName} ${employee.lastName} has been assigned to manager ${manager.firstName} ${manager.lastName}`,
+      employee: updated,
+      assignmentVerified: assignmentSuccess,
+      managerPositionId: managerPositionId.toString(),
+      employeeSupervisorPositionId: verifyEmployee?.supervisorPositionId?.toString(),
+    };
   }
   
   

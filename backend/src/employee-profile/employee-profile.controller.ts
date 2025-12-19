@@ -19,6 +19,7 @@ import { EmployeeProfileService } from './employee-profile.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { ObjectIdValidationPipe } from '../common/pipes/object-id-validation.pipe';
 
 import {
   EMPLOYEE_ROLES,
@@ -34,6 +35,7 @@ import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { SelfUpdateDto } from './dto/self-update.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { CreateManagerDto } from './dto/create-manager.dto';
+import { AssignManagerDto } from './dto/assign-manager.dto';
 
 @Controller('employee-profile')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -62,7 +64,7 @@ export class EmployeeProfileController {
   }
   @Get(':id')
   @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ObjectIdValidationPipe) id: string) {
     return this.employeeProfileService.findOne(id);
   }
 
@@ -82,22 +84,8 @@ export class EmployeeProfileController {
     return this.employeeProfileService.create(dto);
   }
 
-  @Patch(':id')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  update(@Param('id') id: string, @Body() dto: UpdateEmployeeDto) {
-    return this.employeeProfileService.update(id, dto);
-  }
-
-  @Delete(':id')
-  @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  remove(@Param('id') id: string) {
-    return this.employeeProfileService.deactivate(id);
-  }
-
-  
-
   /* =====================================================
-     MANAGERS
+     MANAGERS (MUST BE BEFORE :id ROUTES)
   ===================================================== */
 
   @Post('create-manager')
@@ -108,24 +96,37 @@ export class EmployeeProfileController {
 
   @Patch('assign-manager')
   @Roles(...HR_ROLES, ...ADMIN_ROLES)
-  assignManager(
-    @Body('employeeId') employeeId: string,
-    @Body('managerId') managerId: string,
-  ) {
-    return this.employeeProfileService.assignManager(employeeId, managerId);
+  assignManager(@Body() dto: AssignManagerDto) {
+    return this.employeeProfileService.assignManager(dto.employeeId, dto.managerId);
   }
+
+  @Patch(':id')
+  @Roles(...HR_ROLES, ...ADMIN_ROLES)
+  update(@Param('id', ObjectIdValidationPipe) id: string, @Body() dto: UpdateEmployeeDto) {
+    return this.employeeProfileService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @Roles(...HR_ROLES, ...ADMIN_ROLES)
+  remove(@Param('id', ObjectIdValidationPipe) id: string) {
+    return this.employeeProfileService.deactivate(id);
+  }
+
+  /* =====================================================
+     MANAGERS (TEAM ENDPOINTS)
+  ===================================================== */
 
   @Get('manager/team/:managerId')
   @Roles(...MANAGER_ROLES)
-  getManagerTeam(@Param('managerId') managerId: string) {
+  getManagerTeam(@Param('managerId', ObjectIdValidationPipe) managerId: string) {
     return this.employeeProfileService.getTeamSummaryForManager(managerId);
   }
 
   @Get('manager/team/:managerId/employee/:employeeId')
   @Roles(...MANAGER_ROLES)
   getTeamEmployee(
-    @Param('managerId') managerId: string,
-    @Param('employeeId') employeeId: string,
+    @Param('managerId', ObjectIdValidationPipe) managerId: string,
+    @Param('employeeId', ObjectIdValidationPipe) employeeId: string,
   ) {
     return this.employeeProfileService.getTeamEmployeeSummary(
       managerId,

@@ -47,6 +47,11 @@ export class SelfUpdateDto {
   biography?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(500, { message: "Profile picture URL too long ✅" })
+  profilePictureUrl?: string;
+
+  @IsOptional()
   @ValidateNested() 
   @Type(() => AddressDto)
   address?: AddressDto;

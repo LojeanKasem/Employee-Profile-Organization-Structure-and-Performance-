@@ -27,7 +27,10 @@ register(@Body() dto: RegisterDto) {
   return this.authService.register(dto);
 }
 
-async updateRoles(
+@Put(':id/roles')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(...ADMIN_ROLES, ...HR_ROLES)
+updateRoles(
   @Param('id') id: string,
   @Body('roles') roles: string[],
 ) {

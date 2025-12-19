@@ -22,4 +22,8 @@ export class RegisterDto {
 
   @IsOptional()
   resumeUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  profilePictureUrl?: string; // Base64 encoded image
 }

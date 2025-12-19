@@ -20,9 +20,15 @@ import {
   CandidateDocument,
 } from '../models/candidate.schema';
 
+import {
+  EmployeeSystemRole,
+  EmployeeSystemRoleDocument,
+} from '../models/employee-system-role.schema';
+
 import { EmployeeStatus, SystemRole } from '../enums/employee-profile.enums';
 import { RegisterDto } from '../dto/register.dto';
 import { ADMIN_ROLES } from '../../common/constants/role-groups';
+import { Types } from 'mongoose';
 
 @Injectable()
 export class AuthService {
@@ -32,6 +38,9 @@ export class AuthService {
 
     @InjectModel(Candidate.name)
     private readonly candidateModel: Model<CandidateDocument>,
+
+    @InjectModel(EmployeeSystemRole.name)
+    private readonly employeeSystemRoleModel: Model<EmployeeSystemRoleDocument>,
 
     private readonly jwtService: JwtService,
   ) {}
@@ -126,13 +135,17 @@ export class AuthService {
 }
 
   /* =========================
-     UPDATE ROLES (ADMIN)
+     UPDATE ROLES (ADMIN/HR)
   ========================== */
   async updateUserRoles(userId: string, roles: string[]) {
-    return this.employeeModel.findByIdAndUpdate(
-      userId,
-      { $set: { systemRoles: roles } },
-      { new: true },
+    // Update roles in EmployeeSystemRole collection (correct location)
+    return this.employeeSystemRoleModel.findOneAndUpdate(
+      { employeeProfileId: new Types.ObjectId(userId) },
+      { 
+        roles: roles,
+        isActive: true,
+      },
+      { new: true, upsert: true }, // Create if doesn't exist
     );
   }
 
@@ -165,7 +178,7 @@ export class AuthService {
       lastName: dto.lastName,
       nationalId: dto.nationalId,
       resumeUrl: dto.resumeUrl,
-    
+      profilePictureUrl: dto.profilePictureUrl, // Store base64 image
       applicationDate: new Date(),
     });
 

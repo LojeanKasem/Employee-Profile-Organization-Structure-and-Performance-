@@ -4,8 +4,9 @@ import { Type } from 'class-transformer';
 import { RatingEntryDto } from './rating-entry.dto';
 
 export class CreateAppraisalRecordDto {
+  @IsOptional()
   @IsMongoId()
-  assignmentId: string;
+  assignmentId?: string;
 
   @IsMongoId()
   cycleId: string;
@@ -13,15 +14,16 @@ export class CreateAppraisalRecordDto {
   @IsMongoId()
   templateId: string;
 
-  @IsMongoId()
-  employeeProfileId: string;
+  @IsString()
+  employeeProfileId: string; // Can be ObjectId or employeeNumber
 
   // managerProfileId will come from logged-in user in service/controller, not the body
 
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => RatingEntryDto)
-  ratings: RatingEntryDto[];
+  ratings?: RatingEntryDto[];
 
   @IsOptional()
   @IsNumber()
