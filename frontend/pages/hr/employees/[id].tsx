@@ -58,10 +58,23 @@ export default function HREditEmployeePage() {
         setDepartments(depRes.data?.items || depRes.data || []);
         setPositions(posRes.data?.items || posRes.data || []);
 
+        // Map backend role value to frontend format
+        const reverseRoleMapping: Record<string, string> = {
+          "department employee": "DEPARTMENT_EMPLOYEE",
+          "department head": "DEPARTMENT_HEAD",
+          "HR Employee": "HR_EMPLOYEE",
+          "HR Manager": "HR_MANAGER",
+          "HR Admin": "HR_ADMIN",
+          "System Admin": "SYSTEM_ADMIN",
+        };
+        
+        const backendRole = emp.role || emp.roles?.[0] || "";
+        const frontendRole = reverseRoleMapping[backendRole] || backendRole || "";
+
         setForm({
           firstName: emp.firstName || "",
           lastName: emp.lastName || "",
-          role: emp.role || "",
+          role: frontendRole,
           status: emp.status || "",
         });
 
@@ -126,16 +139,52 @@ export default function HREditEmployeePage() {
       setSaving(true);
       const token = localStorage.getItem("token");
 
+      // Update basic employee info
       await api.patch(
         `/employee-profile/${id}`,
-        form,
+        {
+          firstName: form.firstName,
+          lastName: form.lastName,
+          status: form.status,
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      // Update roles separately if role is provided
+      if (form.role) {
+        try {
+          // Map frontend role value to backend enum value
+          const roleMapping: Record<string, string> = {
+            "DEPARTMENT_EMPLOYEE": "department employee",
+            "DEPARTMENT_HEAD": "department head",
+            "HR_EMPLOYEE": "HR Employee",
+            "HR_MANAGER": "HR Manager",
+            "HR_ADMIN": "HR Admin",
+            "SYSTEM_ADMIN": "System Admin",
+          };
+          
+          const backendRole = roleMapping[form.role] || form.role;
+          
+          // Use the auth endpoint to update roles
+          const roleResponse = await api.put(
+            `/auth/${id}/roles`,
+            { roles: [backendRole] },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          
+          console.log("Role updated successfully:", roleResponse.data);
+        } catch (roleErr: any) {
+          console.error("Role update failed:", roleErr);
+          const errorMsg = roleErr?.response?.data?.message || roleErr?.message || "Unknown error";
+          alert(`Employee updated but role update failed: ${errorMsg}. Please try updating the role again.`);
+        }
+      }
+
       alert("Employee updated ✅");
       router.push("/hr/employees");
-    } catch {
-      alert("Update failed ❌");
+    } catch (err: any) {
+      console.error("Update error:", err);
+      alert(err?.response?.data?.message || "Update failed ❌");
     } finally {
       setSaving(false);
     }

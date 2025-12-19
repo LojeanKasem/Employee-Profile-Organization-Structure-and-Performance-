@@ -107,7 +107,7 @@ export default function EmployeeProfilePage() {
       </div>
 
       {/* BIOGRAPHY */}
-      <div className="glass-card p-8 mb-10">
+      <div className="glass-card p-8 mb-6">
         <h2 className="text-xl font-semibold mb-4 text-cyan-300">
           Biography
         </h2>
@@ -115,6 +115,41 @@ export default function EmployeeProfilePage() {
           {profile.biography || "—"}
         </p>
       </div>
+
+      {/* APPRAISAL HISTORY - BR 16 */}
+      {(profile.lastAppraisalDate || profile.lastAppraisalScore || profile.lastAppraisalRatingLabel) && (
+        <div className="glass-card p-8 mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-cyan-300">
+            Latest Appraisal History
+          </h2>
+          <div className="space-y-2 text-white/90">
+            {profile.lastAppraisalDate && (
+              <p>
+                <strong>Last Appraisal Date:</strong>{" "}
+                {new Date(profile.lastAppraisalDate).toLocaleDateString()}
+              </p>
+            )}
+            {profile.lastAppraisalScore !== undefined && profile.lastAppraisalScore !== null && (
+              <p>
+                <strong>Last Appraisal Score:</strong> {profile.lastAppraisalScore}
+              </p>
+            )}
+            {profile.lastAppraisalRatingLabel && (
+              <p>
+                <strong>Overall Rating:</strong> {profile.lastAppraisalRatingLabel}
+              </p>
+            )}
+          </div>
+          <div className="mt-4">
+            <button
+              onClick={() => router.push("/performance/my-appraisals")}
+              className="text-cyan-400 hover:text-cyan-300 underline text-sm"
+            >
+              View All Appraisals →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ACTION BUTTONS */}
       <div className="flex flex-wrap gap-4">

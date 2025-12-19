@@ -46,8 +46,16 @@ export default function ManagerTeamPage() {
           }
         );
 
-        setTeam(res.data || []);
+        const teamData = res.data || [];
+        setTeam(teamData);
+        
+        // Log for debugging
+        console.log("Team loaded:", teamData.length, "members");
+        if (teamData.length === 0) {
+          console.log("No team members found. Manager ID:", managerId);
+        }
       } catch (err: any) {
+        console.error("Failed to load team:", err);
         setErrorMsg(
           err.response?.data?.message || "Failed to load your team ❌"
         );
@@ -106,43 +114,61 @@ export default function ManagerTeamPage() {
           </thead>
 
           <tbody>
-            {team.map((emp) => (
-              <tr
-                key={emp._id}
-                className="border-t border-white/10 hover:bg-white/5 transition"
-              >
-                <td className="p-3">
-                  {emp.firstName} {emp.lastName}
-                </td>
-                <td className="p-3 text-center">
-                  {emp.employeeNumber}
-                </td>
-                <td className="p-3 text-center">
-                  {emp.primaryDepartmentId?.name || "—"}
-                </td>
-                <td className="p-3 text-center">
-                  {emp.primaryPositionId?.title ||
-                    emp.primaryPositionId?.name ||
-                    "—"}
-                </td>
-                <td className="p-3 text-center">
-                  {emp.status}
-                </td>
-                <td className="p-3 text-center">
-                  {emp.dateOfHire
-                    ? new Date(emp.dateOfHire).toLocaleDateString()
-                    : "—"}
-                </td>
-                <td className="p-3 text-center">
-                  <button
-                    onClick={() => router.push(`/manager/team/${emp._id}`)}
-                    className="glow-btn px-4 py-1 text-sm"
-                  >
-                    View Summary
-                  </button>
+            {team.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="p-8 text-center text-white/60">
+                  <div className="flex flex-col items-center gap-3">
+                    <span className="text-4xl">👥</span>
+                    <div>
+                      <p className="font-medium mb-1">No team members found</p>
+                      <p className="text-sm text-white/50">
+                        Employees will appear here when they have you set as their supervisor.
+                        <br />
+                        Make sure employees have their <code className="bg-white/10 px-1 rounded">supervisorPositionId</code> set to your position.
+                      </p>
+                    </div>
+                  </div>
                 </td>
               </tr>
-            ))}
+            ) : (
+              team.map((emp) => (
+                <tr
+                  key={emp._id}
+                  className="border-t border-white/10 hover:bg-white/5 transition"
+                >
+                  <td className="p-3">
+                    {emp.firstName} {emp.lastName}
+                  </td>
+                  <td className="p-3 text-center">
+                    {emp.employeeNumber}
+                  </td>
+                  <td className="p-3 text-center">
+                    {emp.primaryDepartmentId?.name || "—"}
+                  </td>
+                  <td className="p-3 text-center">
+                    {emp.primaryPositionId?.title ||
+                      emp.primaryPositionId?.name ||
+                      "—"}
+                  </td>
+                  <td className="p-3 text-center">
+                    {emp.status}
+                  </td>
+                  <td className="p-3 text-center">
+                    {emp.dateOfHire
+                      ? new Date(emp.dateOfHire).toLocaleDateString()
+                      : "—"}
+                  </td>
+                  <td className="p-3 text-center">
+                    <button
+                      onClick={() => router.push(`/manager/team/${emp._id}`)}
+                      className="glow-btn px-4 py-1 text-sm"
+                    >
+                      View Summary
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
 

@@ -62,6 +62,20 @@ const modules = [
     route: "/subsystems/recruitment",
   },
   {
+    name: "Onboarding",
+    desc: "Create onboarding checklists, manage new hire tasks, and track onboarding progress.",
+    icon: <UserPlus className="w-8 h-8" />,
+    gradient: "from-green-500 to-emerald-500",
+    route: "/subsystems/onboarding",
+  },
+  {
+    name: "Offboarding",
+    desc: "Manage resignations, terminations, clearance checklists, and employee exits.",
+    icon: <UserPlus className="w-8 h-8" />,
+    gradient: "from-red-500 to-rose-500",
+    route: "/subsystems/offboarding",
+  },
+  {
     name: "Time Management",
     desc: "Attendance, overtime, shifts, schedules, and time exception handling.",
     icon: <Clock className="w-8 h-8" />,
@@ -100,7 +114,7 @@ export default function Home(): JSX.Element {
   ===================================================== */
   const visibleModules =
     userType === "CANDIDATE"
-      ? modules.filter((m) => m.name === "Recruitment")
+      ? modules.filter((m) => m.name === "Recruitment" || m.name === "Onboarding")
       : modules;
 
   /* =====================================================

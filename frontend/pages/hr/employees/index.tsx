@@ -117,10 +117,15 @@ export default function HREmployeesPage() {
 
             <tbody className="divide-y divide-white/10">
               {employees.map((e) => {
-                const role =
-                  Array.isArray(e.roles) && e.roles.length > 0
-                    ? e.roles.join(", ")
-                    : "—";
+                // Handle both 'role' (singular from backend) and 'roles' (array)
+                let roleDisplay = "—";
+                if (Array.isArray(e.roles) && e.roles.length > 0) {
+                  roleDisplay = e.roles.join(", ");
+                } else if (e.role) {
+                  roleDisplay = e.role;
+                } else if (e.systemRole) {
+                  roleDisplay = e.systemRole;
+                }
 
                 const department =
                   e.primaryDepartmentId &&
@@ -141,7 +146,11 @@ export default function HREmployeesPage() {
                       {e.firstName} {e.lastName}
                     </td>
 
-                    <td className="p-4">{role}</td>
+                    <td className="p-4">
+                      <span className="px-2 py-1 rounded text-xs bg-white/10 border border-white/20">
+                        {roleDisplay}
+                      </span>
+                    </td>
                     <td className="p-4">{department}</td>
                     <td className="p-4">{position}</td>
 

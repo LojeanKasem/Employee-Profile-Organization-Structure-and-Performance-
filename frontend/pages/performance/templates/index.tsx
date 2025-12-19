@@ -1,21 +1,47 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import axios from "axios";
+import api from "../../../api/axios";
 import styles from "../../../styles/CreateTemplate.module.css";
 import { useRouter } from "next/router";
+import { getCurrentRole } from "../../../utils/routeGuard";
 
 export default function PerformanceTemplatesPage() {
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   /* ===============================
-     LOAD TEMPLATES (BACKEND)
+     ROLE (CLIENT ONLY)
+  =============================== */
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrentRole(getCurrentRole());
+  }, []);
+
+  const isHR = currentRole === "HR";
+  const isManager = currentRole === "MANAGER";
+
+  useEffect(() => {
+    if (currentRole && !isHR && !isManager) {
+      router.push("/dashboard");
+    }
+  }, [currentRole, isHR, isManager, router]);
+
+  /* ===============================
+     STATE
+  =============================== */
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [operationLoading, setOperationLoading] = useState<string | null>(null);
+
+  /* ===============================
+     LOAD TEMPLATES
   =============================== */
   useEffect(() => {
-    loadTemplates();
-  }, []);
+    if (currentRole) {
+      loadTemplates();
+    }
+  }, [currentRole, router.query.refresh]);
 
   async function loadTemplates() {
     try {
@@ -23,26 +49,26 @@ export default function PerformanceTemplatesPage() {
       setError(null);
 
       const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
 
-      const res = await axios.get(
-        "http://localhost:3001/performance/templates",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await api.get("/performance/templates", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-      const data = res.data;
+      const list = Array.isArray(res.data)
+        ? res.data
+        : res.data?.items ?? res.data?.data ?? [];
 
-      // ✅ SAFE NORMALIZATION
-      const list = Array.isArray(data)
-        ? data
-        : data?.items ?? data?.data ?? [];
+      const filtered =
+        isManager && !isHR
+          ? list.filter((t: any) => t.isActive !== false)
+          : list;
 
-      setTemplates(list);
-    } catch (err: any) {
-      console.error("LOAD TEMPLATES ERROR", err);
+      setTemplates(filtered);
+    } catch {
       setError("Failed to load templates");
       setTemplates([]);
     } finally {
@@ -51,27 +77,24 @@ export default function PerformanceTemplatesPage() {
   }
 
   /* ===============================
-     DELETE TEMPLATE (BACKEND)
+     DELETE TEMPLATE
   =============================== */
   async function deleteTemplate(id: string) {
     if (!confirm("Delete this template?")) return;
 
     try {
+      setOperationLoading(`delete-${id}`);
       const token = localStorage.getItem("token");
 
-      await axios.delete(
-        `http://localhost:3001/performance/templates/${id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      await api.delete(`/performance/templates/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       loadTemplates();
-    } catch (err) {
-      console.error("DELETE TEMPLATE ERROR", err);
-      alert("Failed to delete template");
+    } catch {
+      setError("Failed to delete template");
+    } finally {
+      setOperationLoading(null);
     }
   }
 
@@ -81,6 +104,7 @@ export default function PerformanceTemplatesPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card} style={{ maxWidth: 900 }}>
+        {/* BACK */}
         <button
           type="button"
           onClick={() => router.push("/dashboard")}
@@ -91,19 +115,55 @@ export default function PerformanceTemplatesPage() {
 
         <h1 className={styles.title}>Performance Templates</h1>
 
-        <Link href="/performance/templates/create">
-          <button className={styles.button} style={{ marginBottom: 20 }}>
+        {/* CREATE TEMPLATE (HR ONLY) */}
+        {isHR && (
+          <Link
+            href="/performance/templates/create"
+            className={styles.button}
+            style={{ marginBottom: 20, display: "inline-block" }}
+          >
             + Create Template
-          </button>
-        </Link>
-
-        {loading && <p>Loading...</p>}
-        {error && <p className={styles.error}>{error}</p>}
-
-        {!loading && templates.length === 0 && (
-          <p>No templates created yet.</p>
+          </Link>
         )}
 
+        {/* MANAGER INFO */}
+        {isManager && (
+          <div
+            style={{
+              marginBottom: 20,
+              padding: "12px 16px",
+              backgroundColor: "rgba(255,193,7,0.1)",
+              border: "1px solid rgba(255,193,7,0.3)",
+              borderRadius: 8,
+              color: "#ffc107",
+            }}
+          >
+            ℹ️ Read-only view. Templates are managed by HR.
+          </div>
+        )}
+
+        {/* LOADING */}
+        {loading && (
+          <div style={{ textAlign: "center", padding: 40 }}>
+            <p>Loading templates...</p>
+          </div>
+        )}
+
+        {/* ERROR */}
+        {error && <div className={styles.error}>{error}</div>}
+
+        {/* EMPTY */}
+        {!loading && templates.length === 0 && isHR && (
+          <Link
+            href="/performance/templates/create"
+            className={styles.button}
+            style={{ marginTop: 20 }}
+          >
+            + Create Template
+          </Link>
+        )}
+
+        {/* TABLE */}
         {!loading && templates.length > 0 && (
           <table width="100%" cellPadding={10}>
             <thead>
@@ -122,18 +182,24 @@ export default function PerformanceTemplatesPage() {
                   <td>{t.ratingScale?.type}</td>
                   <td>
                     <div className={styles.actions}>
-                      <Link href={`/performance/templates/${t._id}`}>
-                        <button className={styles.viewBtn}>
-                          View
-                        </button>
+                      <Link
+                        href={`/performance/templates/${t._id}`}
+                        className={styles.viewBtn}
+                      >
+                        View
                       </Link>
 
-                      <button
-                        className={styles.deleteBtn}
-                        onClick={() => deleteTemplate(t._id)}
-                      >
-                        Delete
-                      </button>
+                      {isHR && (
+                        <button
+                          className={styles.deleteBtn}
+                          onClick={() => deleteTemplate(t._id)}
+                          disabled={operationLoading === `delete-${t._id}`}
+                        >
+                          {operationLoading === `delete-${t._id}`
+                            ? "Deleting..."
+                            : "Delete"}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

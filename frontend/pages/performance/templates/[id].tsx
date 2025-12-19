@@ -1,19 +1,34 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../../api/axios";
+import axios from "@/api/axios";
 import styles from "../../../styles/CreateTemplate.module.css";
 
 export default function EditTemplatePage() {
   const router = useRouter();
   const { id } = router.query;
 
-  const [form, setForm] = useState<any>(null);
+  /* ===============================
+     STATE
+  =============================== */
+  const [form, setForm] = useState<any>({
+    name: "",
+    templateType: "ANNUAL",
+    description: "",
+    ratingScale: {
+      type: "FIVE_POINT",
+      min: 1,
+      max: 5,
+    },
+  });
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   /* ===============================
-     LOAD TEMPLATE (BACKEND)
+     LOAD TEMPLATE
   =============================== */
   useEffect(() => {
     if (id) loadTemplate();
@@ -26,20 +41,22 @@ export default function EditTemplatePage() {
 
       const token = localStorage.getItem("token");
 
-      const res = await axios.get(
-        `/performance/templates/${id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await api.get(`/performance/templates/${id}`, {
+  headers: { Authorization: `Bearer ${token}` },
+});
 
-      setForm(res.data);
+
+      setForm({
+        ...res.data,
+        ratingScale: res.data.ratingScale || {
+          type: "FIVE_POINT",
+          min: 1,
+          max: 5,
+        },
+      });
     } catch (err) {
       console.error("LOAD TEMPLATE ERROR", err);
       setError("Failed to load template");
-      setForm(null);
     } finally {
       setLoading(false);
     }
@@ -50,22 +67,26 @@ export default function EditTemplatePage() {
   =============================== */
   function handleChange(e: any) {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    setForm((prev: any) => ({
+      ...prev,
+      [name]: value,
+    }));
   }
 
   function handleRatingScaleChange(e: any) {
     const { name, value } = e.target;
-    setForm({
-      ...form,
+
+    setForm((prev: any) => ({
+      ...prev,
       ratingScale: {
-        ...form.ratingScale,
+        ...prev.ratingScale,
         [name]: name === "type" ? value : Number(value),
       },
-    });
+    }));
   }
 
   /* ===============================
-     SAVE TEMPLATE (BACKEND)
+     SAVE TEMPLATE
   =============================== */
   async function save() {
     if (!form.name?.trim()) {
@@ -73,7 +94,10 @@ export default function EditTemplatePage() {
       return;
     }
 
-    if (form.ratingScale.min >= form.ratingScale.max) {
+    if (
+      !form.ratingScale ||
+      form.ratingScale.min >= form.ratingScale.max
+    ) {
       setError("Rating scale min must be less than max");
       return;
     }
@@ -84,17 +108,29 @@ export default function EditTemplatePage() {
 
       const token = localStorage.getItem("token");
 
-      await axios.patch(
-        `/performance/templates/${id}`,
-        form,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const payload = {
+        ...form,
+        templateType: form.templateType,
+      };
 
-      router.push("/performance/templates");
+      const res = await api.patch(
+  `/performance/templates/${id}`,
+  payload,
+  { headers: { Authorization: `Bearer ${token}` } }
+);
+
+
+      setForm({
+        ...res.data,
+        ratingScale: res.data.ratingScale || form.ratingScale,
+      });
+
+      setSuccessMessage("Template updated successfully!");
+setTimeout(() => {
+  router.push("/performance/templates?refresh=true");
+}, 800);
+
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
       console.error("SAVE TEMPLATE ERROR", err);
       setError(err?.response?.data?.message || "Failed to save changes");
@@ -114,35 +150,29 @@ export default function EditTemplatePage() {
     );
   }
 
-  if (!form) {
-    return (
-      <div className={styles.page}>
-        <p>Template not found</p>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <div className={styles.card}>
         <h1 className={styles.title}>Edit Performance Template</h1>
 
+        {/* NAME */}
         <div className={styles.field}>
           <label>Name</label>
           <input
             className={styles.input}
             name="name"
-            value={form.name}
+            value={form.name || ""}
             onChange={handleChange}
           />
         </div>
 
+        {/* TEMPLATE TYPE */}
         <div className={styles.field}>
           <label>Template Type</label>
           <select
             className={styles.select}
             name="templateType"
-            value={form.templateType}
+            value={form.templateType || "ANNUAL"}
             onChange={handleChange}
           >
             <option value="ANNUAL">Annual</option>
@@ -153,13 +183,14 @@ export default function EditTemplatePage() {
           </select>
         </div>
 
+        {/* RATING SCALE */}
         <div className={styles.field}>
           <label>Rating Scale</label>
 
           <select
             className={styles.select}
             name="type"
-            value={form.ratingScale?.type}
+            value={form.ratingScale?.type || "FIVE_POINT"}
             onChange={handleRatingScaleChange}
           >
             <option value="THREE_POINT">3 Point</option>
@@ -172,19 +203,20 @@ export default function EditTemplatePage() {
               className={styles.input}
               type="number"
               name="min"
-              value={form.ratingScale?.min}
+              value={form.ratingScale?.min ?? ""}
               onChange={handleRatingScaleChange}
             />
             <input
               className={styles.input}
               type="number"
               name="max"
-              value={form.ratingScale?.max}
+              value={form.ratingScale?.max ?? ""}
               onChange={handleRatingScaleChange}
             />
           </div>
         </div>
 
+        {/* DESCRIPTION */}
         <div className={styles.field}>
           <label>Description</label>
           <textarea
@@ -195,8 +227,25 @@ export default function EditTemplatePage() {
           />
         </div>
 
+        {/* MESSAGES */}
         {error && <div className={styles.error}>{error}</div>}
 
+        {successMessage && (
+          <div
+            style={{
+              padding: "10px",
+              backgroundColor: "rgba(34, 197, 94, 0.2)",
+              border: "1px solid rgb(34, 197, 94)",
+              borderRadius: "4px",
+              color: "rgb(74, 222, 128)",
+              marginBottom: "10px",
+            }}
+          >
+            {successMessage}
+          </div>
+        )}
+
+        {/* ACTIONS */}
         <button
           className={styles.button}
           onClick={save}

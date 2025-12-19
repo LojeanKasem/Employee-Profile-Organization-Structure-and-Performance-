@@ -14,6 +14,7 @@ export default function RegisterPage() {
     resumeUrl: "",
   });
 
+  const [photo, setPhoto] = useState<File | null>(null);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -28,19 +29,49 @@ export default function RegisterPage() {
     try {
       setLoading(true);
 
-      await api.post("/auth/register", {
+      // Convert photo to base64 if provided
+      let profilePictureUrl: string | undefined;
+      if (photo) {
+        if (photo.size > 5 * 1024 * 1024) {
+          setMsg("Photo size must be less than 5MB");
+          setLoading(false);
+          return;
+        }
+        
+        profilePictureUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(photo);
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+        });
+      }
+
+      const payload: any = {
         candidateNumber: form.candidateNumber,
         password: form.password,
         firstName: form.firstName,
         lastName: form.lastName,
         nationalId: form.nationalId,
-        resumeUrl: form.resumeUrl || undefined,
-      });
+      };
+
+      if (form.resumeUrl) {
+        payload.resumeUrl = form.resumeUrl;
+      }
+
+      if (profilePictureUrl) {
+        payload.profilePictureUrl = profilePictureUrl;
+      }
+
+      await api.post("/auth/register", payload);
 
       alert("Candidate registered successfully ✅");
       router.push("/login");
     } catch (err: any) {
-      setMsg(err.response?.data?.message || "Registration failed ❌");
+      setMsg(
+        err.response?.data?.message || 
+        err.response?.data?.errors?.join?.(", ") ||
+        "Registration failed ❌"
+      );
     } finally {
       setLoading(false);
     }
@@ -60,98 +91,102 @@ export default function RegisterPage() {
 
         <form onSubmit={handleRegister} className="space-y-4">
 
-          {/* CANDIDATE NUMBER */}
-          <div>
-            <label className="text-sm text-white/70">
-              Candidate Number
-            </label>
-            <input
-              className="input"
-              placeholder="CAND2025-001"
-              value={form.candidateNumber}
-              onChange={(e) =>
-                update("candidateNumber", e.target.value)
-              }
-              required
-            />
-          </div>
+          <input
+            className="input"
+            placeholder="CAND2025-001"
+            value={form.candidateNumber}
+            onChange={(e) =>
+              update("candidateNumber", e.target.value)
+            }
+            required
+          />
 
-          {/* PASSWORD */}
-          <div>
-            <label className="text-sm text-white/70">
-              Password
-            </label>
-            <input
-              className="input"
-              type="password"
-              placeholder="••••••••"
-              value={form.password}
-              onChange={(e) => update("password", e.target.value)}
-              required
-            />
-          </div>
+          <input
+            className="input"
+            type="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={(e) =>
+              update("password", e.target.value)
+            }
+            required
+          />
 
-          {/* NAME */}
           <div className="grid grid-cols-2 gap-3">
             <input
               className="input"
               placeholder="First Name"
               value={form.firstName}
-              onChange={(e) => update("firstName", e.target.value)}
+              onChange={(e) =>
+                update("firstName", e.target.value)
+              }
               required
             />
             <input
               className="input"
               placeholder="Last Name"
               value={form.lastName}
-              onChange={(e) => update("lastName", e.target.value)}
-              required
-            />
-          </div>
-
-          {/* NATIONAL ID */}
-          <div>
-            <input
-              className="input"
-              placeholder="National ID"
-              value={form.nationalId}
               onChange={(e) =>
-                update("nationalId", e.target.value)
+                update("lastName", e.target.value)
               }
               required
             />
           </div>
 
-          {/* RESUME */}
+          <input
+            className="input"
+            placeholder="National ID"
+            value={form.nationalId}
+            onChange={(e) =>
+              update("nationalId", e.target.value)
+            }
+            required
+          />
+
+          <input
+            className="input"
+            placeholder="Resume URL (optional)"
+            value={form.resumeUrl}
+            onChange={(e) =>
+              update("resumeUrl", e.target.value)
+            }
+          />
+
+          {/* ✅ PHOTO UPLOAD */}
           <div>
+            <label className="block text-sm text-white/70 mb-1">
+              Photo (optional)
+            </label>
             <input
-              className="input"
-              placeholder="Resume URL (optional)"
-              value={form.resumeUrl}
+              type="file"
+              accept="image/*"
               onChange={(e) =>
-                update("resumeUrl", e.target.value)
+                setPhoto(e.target.files?.[0] || null)
               }
+              className="input"
             />
+            {photo && (
+              <p className="text-xs text-white/50 mt-1">
+                Selected: {photo.name} ({(photo.size / 1024).toFixed(1)} KB)
+              </p>
+            )}
           </div>
 
-          {/* SUBMIT */}
           <button
             type="submit"
             disabled={loading}
-            className="glow-btn w-full mt-2"
+            className="glow-btn w-full"
           >
             {loading ? "Registering..." : "Apply Now"}
           </button>
         </form>
 
-        {/* ERROR */}
         {msg && (
           <p className="text-center mt-4 text-red-400">
             {msg}
           </p>
         )}
 
-        {/* FOOTER */}
         <p className="text-center text-sm text-white/60 mt-6">
           Already applied?{" "}
           <span

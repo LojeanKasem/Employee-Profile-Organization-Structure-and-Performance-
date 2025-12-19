@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import api from "../api/axios";
+import ProfilePictureUpload from "../components/ProfilePictureUpload";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -73,7 +74,16 @@ export default function Dashboard() {
     disputes: false,
     organization: false,
     performance: false,
+    managerAssignment: false,
   });
+
+  // Manager Assignment state
+  const [managersList, setManagersList] = useState<any[]>([]);
+  const [loadingManagers, setLoadingManagers] = useState(false);
+  const [selectedEmployeeForManager, setSelectedEmployeeForManager] = useState("");
+  const [selectedManagerForAssignment, setSelectedManagerForAssignment] = useState("");
+  const [assigningManager, setAssigningManager] = useState(false);
+  const [managerAssignmentError, setManagerAssignmentError] = useState<string | null>(null);
 
   // Change Requests status filter
   const [changeRequestFilter, setChangeRequestFilter] = useState<"PENDING" | "APPROVED" | "REJECTED" | "ALL">("PENDING");
@@ -164,7 +174,7 @@ export default function Dashboard() {
     // Load dashboard widgets
     if (normalizedRole === "SYSTEM_ADMIN") {
       loadAdminDashboardData(token);
-    } else if (normalizedRole === "HR_MANAGER") {
+    } else if (normalizedRole === "HR_MANAGER" || normalizedRole === "HR_EMPLOYEE" || normalizedRole === "HR_ADMIN") {
       loadHRManagerData(token);
     } else if (normalizedRole === "DEPARTMENT_HEAD") {
       loadManagerDashboardData(token);
@@ -377,6 +387,121 @@ export default function Dashboard() {
         loading: false,
         error: error.response?.data?.message || "Failed to load data",
       }));
+    }
+  }
+
+  // Load managers (department heads) for manager assignment
+  async function loadManagers() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setLoadingManagers(true);
+      setManagerAssignmentError(null);
+      
+      // Get all employees
+      const employeesRes = await api.get("/employee-profile", {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { page: 1, limit: 500 },
+      });
+
+      const allEmployees = employeesRes.data?.items || employeesRes.data?.data || employeesRes.data || [];
+      
+      // Filter for employees with DEPARTMENT_HEAD role AND who have a position assigned
+      // Roles can be in different formats: "DEPARTMENT_HEAD", "department head", "Department Head", etc.
+      const managers = allEmployees.filter((emp: any) => {
+        // Check roles array (from EmployeeSystemRole collection)
+        const roles = emp.roles || (emp.role ? [emp.role] : []);
+        
+        // Normalize role strings for comparison
+        const normalizedRoles = roles.map((r: string) => 
+          typeof r === 'string' ? r.toLowerCase().trim() : String(r).toLowerCase().trim()
+        );
+        
+        const hasManagerRole = normalizedRoles.some((r: string) => 
+          r === "department_head" || 
+          r === "department head" ||
+          r.includes("head") ||
+          (r.includes("manager") && !r.includes("hr") && !r.includes("payroll"))
+        );
+        
+        // Must have manager role, be active, AND have a position assigned
+        const hasPosition = emp.primaryPositionId && 
+                           (typeof emp.primaryPositionId === 'object' || typeof emp.primaryPositionId === 'string');
+        
+        return hasManagerRole && 
+               emp.status === "ACTIVE" && 
+               hasPosition;
+      });
+
+      setManagersList(managers);
+      
+      if (managers.length === 0) {
+        console.warn("No managers found. Employees:", allEmployees.length, "Active:", allEmployees.filter((e: any) => e.status === "ACTIVE").length);
+        setManagerAssignmentError("No managers available. To fix this: 1) Create an employee with DEPARTMENT_HEAD role, 2) Assign them a department and position, 3) Ensure they are ACTIVE.");
+      }
+    } catch (error: any) {
+      console.error("Failed to load managers:", error);
+      setManagersList([]);
+      setManagerAssignmentError("Failed to load managers. Please try again.");
+    } finally {
+      setLoadingManagers(false);
+    }
+  }
+
+  // Assign manager to employee
+  async function assignManagerToEmployee() {
+    if (!selectedEmployeeForManager || !selectedManagerForAssignment) {
+      setManagerAssignmentError("Please select both employee and manager");
+      return;
+    }
+
+    try {
+      setAssigningManager(true);
+      setManagerAssignmentError(null);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const response = await api.patch(
+        `/employee-profile/assign-manager`,
+        {
+          employeeId: selectedEmployeeForManager,
+          managerId: selectedManagerForAssignment,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Success - show message and reset
+      setManagerAssignmentError(null);
+      
+      // Show success message
+      const successMsg = "Manager assigned successfully ✅";
+      alert(successMsg);
+      
+      // Reset form
+      setSelectedEmployeeForManager("");
+      setSelectedManagerForAssignment("");
+      
+      // Reload HR data to reflect changes
+      try {
+        await loadHRManagerData(token);
+      } catch (reloadError) {
+        console.warn("Failed to reload HR data:", reloadError);
+      }
+    } catch (error: any) {
+      console.error("Failed to assign manager:", error);
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          "Failed to assign manager. Please ensure the manager has a position assigned.";
+      setManagerAssignmentError(errorMessage);
+      
+      // Show alert for better visibility
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setAssigningManager(false);
     }
   }
 
@@ -1167,18 +1292,44 @@ export default function Dashboard() {
           <div className="lg:col-span-3 max-w-[1200px] mx-auto relative z-10 px-4 sm:px-6">
             {/* Header */}
             <div className="mb-8 sm:mb-10">
-              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3 bg-gradient-to-r from-white via-cyan-100 to-white bg-clip-text text-transparent">
-                Employee Dashboard
-              </h1>
-              <div className="flex flex-wrap items-center gap-3">
-                <p className="text-white/90 text-base sm:text-lg font-medium">
-                  Welcome, {employeeProfile?.firstName && employeeProfile?.lastName
-                    ? `${employeeProfile.firstName} ${employeeProfile.lastName}`.trim()
-                    : username}
-                </p>
-                <span className="px-4 py-1.5 rounded-full bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-400/30 text-xs font-semibold uppercase tracking-wider shadow-lg shadow-cyan-500/10">
-                  EMPLOYEE
-                </span>
+              <div className="flex items-center gap-4 mb-4">
+                {/* Profile Picture */}
+                <div className="relative">
+                  {employeeProfile?.profilePictureUrl ? (
+                    <img
+                      src={employeeProfile.profilePictureUrl}
+                      alt={`${employeeProfile?.firstName || ''} ${employeeProfile?.lastName || ''}`}
+                      className="w-20 h-20 rounded-full object-cover border-2 border-cyan-400/50 shadow-lg"
+                      onError={(e) => {
+                        // Fallback to initials if image fails to load
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div 
+                    className={`w-20 h-20 rounded-full bg-gradient-to-br from-cyan-500/30 to-blue-500/30 border-2 border-cyan-400/50 flex items-center justify-center text-2xl font-bold text-white shadow-lg ${employeeProfile?.profilePictureUrl ? 'hidden' : 'flex'}`}
+                  >
+                    {employeeProfile?.firstName?.[0]?.toUpperCase() || 'U'}
+                    {employeeProfile?.lastName?.[0]?.toUpperCase() || ''}
+                  </div>
+                </div>
+                <div>
+                  <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 bg-gradient-to-r from-white via-cyan-100 to-white bg-clip-text text-transparent">
+                    Employee Dashboard
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="text-white/90 text-base sm:text-lg font-medium">
+                      Welcome, {employeeProfile?.firstName && employeeProfile?.lastName
+                        ? `${employeeProfile.firstName} ${employeeProfile.lastName}`.trim()
+                        : username}
+                    </p>
+                    <span className="px-4 py-1.5 rounded-full bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-400/30 text-xs font-semibold uppercase tracking-wider shadow-lg shadow-cyan-500/10">
+                      EMPLOYEE
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1247,6 +1398,24 @@ export default function Dashboard() {
                     
 
                     
+                    {/* Profile Picture Upload */}
+                    <ProfilePictureUpload
+                      profilePictureUrl={employeeProfile?.profilePictureUrl}
+                      firstName={employeeProfile?.firstName}
+                      lastName={employeeProfile?.lastName}
+                      onUploadSuccess={async () => {
+                        const token = localStorage.getItem("token");
+                        if (token) {
+                          await loadEmployeeDashboardData(token);
+                        }
+                      }}
+                      onError={(error) => setProfileSaveError(error)}
+                      onSuccess={(message) => {
+                        setProfileSaveSuccess(true);
+                        setTimeout(() => setProfileSaveSuccess(false), 3000);
+                      }}
+                    />
+
                     <button
   onClick={() => router.push("employee-profile/change-request")}
   className="glass-btn w-full text-sm py-3 font-medium rounded-xl hover:bg-white/10 transition-all duration-200"
@@ -1650,46 +1819,10 @@ export default function Dashboard() {
 
 
 
-        {/* ===== HR EMPLOYEE ===== */}
-        {role === "HR_EMPLOYEE" && (
-          <div className="lg:col-span-3">
-            <div className="glass-card p-6">
-              <h2 className="text-xl font-semibold mb-6 text-white border-b border-white/10 pb-3">
-                HR Panel
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button
-                onClick={() => router.push("/hr/employees")}
-                  className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
-              >
-                  <span className="text-2xl">👤</span>
-                  <span className="text-sm font-medium">Manage Employees</span>
-              </button>
-
-              <button
-                onClick={() => router.push("/organization-structure")}
-                  className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
-              >
-                  <span className="text-2xl">🏢</span>
-                  <span className="text-sm font-medium">Organization Structure</span>
-              </button>
-
-              <button
-                onClick={() => router.push("/hr/change-requests")}
-                  className="glow-btn h-24 flex flex-col items-center justify-center gap-2 transition-all"
-              >
-                  <span className="text-2xl">📄</span>
-                  <span className="text-sm font-medium">Approve Requests</span>
-              </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ===== HR MANAGER ===== */}
-        {/* HR Manager Dashboard - Only accessible to HR_MANAGER role */}
-        {/* HR Manager CANNOT access: Access Control, System Governance, Role Assignment */}
-        {role === "HR_MANAGER" && (
+        {/* ===== HR MANAGER / HR EMPLOYEE / HR ADMIN ===== */}
+        {/* HR Manager Dashboard - Accessible to HR_MANAGER, HR_EMPLOYEE, and HR_ADMIN roles */}
+        {/* HR roles CANNOT access: Access Control, System Governance, Role Assignment */}
+        {(role === "HR_MANAGER" || role === "HR_EMPLOYEE" || role === "HR_ADMIN") && (
           <div className="lg:col-span-3">
             {/* 1. HR MANAGER HEADER */}
             <div className="glass-card p-5 mb-4">
@@ -1947,6 +2080,150 @@ hr
                       })()}
                     </div>
                   )}
+                </>
+              )}
+            </div>
+
+            {/* 3.5. MANAGER ASSIGNMENT */}
+            <div id="hr-manager-assignment-section" className="glass-card p-4 mb-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 flex-1">
+                  <h2 className="text-sm font-semibold text-white">Manager Assignment</h2>
+                  <span className="px-1.5 py-0.5 text-xs text-white/50 bg-white/5 border border-white/10 rounded">Operational</span>
+                  <p className="text-xs text-white/50">
+                    Assign employees to managers
+                  </p>
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => {
+                      setHrSections(prev => ({ ...prev, managerAssignment: !prev.managerAssignment }));
+                      if (!hrSections.managerAssignment && managersList.length === 0) {
+                        loadManagers();
+                      }
+                    }}
+                    className="px-2.5 py-1 text-xs text-white font-medium rounded bg-white/10 hover:bg-white/15 border border-white/20 transition-colors"
+                  >
+                    {hrSections.managerAssignment ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
+              {hrSections.managerAssignment && (
+                <>
+                  <div className="space-y-3 pt-2 border-t border-white/10">
+                    {managerAssignmentError && (
+                      <div className="bg-red-500/20 text-red-200 border border-red-500/40 rounded-lg px-4 py-3 text-sm flex items-start gap-2">
+                        <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <div className="flex-1">
+                          <p className="font-medium">Error</p>
+                          <p className="text-xs mt-0.5">{managerAssignmentError}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* Employee Selection */}
+                      <div>
+                        <label className="block text-xs font-semibold text-white/70 mb-1.5">
+                          Select Employee <span className="text-red-400">*</span>
+                        </label>
+                        <select
+                          value={selectedEmployeeForManager}
+                          onChange={(e) => {
+                            setSelectedEmployeeForManager(e.target.value);
+                            setManagerAssignmentError(null);
+                          }}
+                          className="w-full px-3 py-2 text-xs rounded bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-colors"
+                        >
+                          <option value="">Select employee...</option>
+                          {hrData.employees
+                            .filter((emp: any) => emp.status === "ACTIVE")
+                            .map((emp: any) => (
+                              <option key={emp._id} value={emp._id}>
+                                {emp.firstName} {emp.lastName} ({emp.employeeNumber || "N/A"})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      {/* Manager Selection */}
+                      <div>
+                        <label className="block text-xs font-semibold text-white/70 mb-1.5">
+                          Select Manager <span className="text-red-400">*</span>
+                        </label>
+                        <select
+                          value={selectedManagerForAssignment || ""}
+                          onChange={(e) => {
+                            setSelectedManagerForAssignment(e.target.value);
+                            setManagerAssignmentError(null);
+                          }}
+                          onFocus={() => {
+                            if (managersList.length === 0 && !loadingManagers) {
+                              loadManagers();
+                            }
+                          }}
+                          disabled={loadingManagers}
+                          className="w-full px-3 py-2 text-xs rounded bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="">
+                            {loadingManagers ? "Loading managers..." : "Select manager..."}
+                          </option>
+                          {!loadingManagers && managersList.length === 0 ? (
+                            <option value="" disabled>No managers available</option>
+                          ) : (
+                            managersList.map((manager: any) => (
+                              <option key={manager._id} value={manager._id}>
+                                {manager.firstName} {manager.lastName} 
+                                {manager.employeeNumber ? ` (${manager.employeeNumber})` : ""}
+                                {manager.primaryDepartmentId && typeof manager.primaryDepartmentId === "object" 
+                                  ? ` - ${manager.primaryDepartmentId.name}` 
+                                  : ""}
+                                {manager.primaryPositionId && typeof manager.primaryPositionId === "object"
+                                  ? ` - ${manager.primaryPositionId.title || manager.primaryPositionId.name}`
+                                  : ""}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                        {loadingManagers && (
+                          <p className="text-xs text-white/50 mt-1">
+                            Loading managers...
+                          </p>
+                        )}
+                        {!loadingManagers && managersList.length === 0 && (
+                          <div className="mt-2 space-y-2">
+                            <p className="text-xs text-white/50">
+                              No managers found. To create a manager:
+                            </p>
+                            <ol className="text-xs text-white/60 space-y-1 ml-4 list-decimal">
+                              <li>Go to <button onClick={() => router.push("/hr/employees/create")} className="text-cyan-400 hover:text-cyan-300 underline">Create Employee</button></li>
+                              <li>Set System Role to "Department Head"</li>
+                              <li>Assign a Department and Position</li>
+                              <li>Ensure status is "ACTIVE"</li>
+                            </ol>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Assign Button */}
+                    <div className="flex justify-end pt-2">
+                      <button
+                        onClick={assignManagerToEmployee}
+                        disabled={assigningManager || !selectedEmployeeForManager || !selectedManagerForAssignment}
+                        className="px-4 py-2 text-xs text-white font-medium rounded bg-cyan-600 hover:bg-cyan-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {assigningManager ? "Assigning..." : "Assign Manager"}
+                      </button>
+                    </div>
+
+                    {/* Info Note */}
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2 text-xs text-blue-300/90">
+                      <span className="text-blue-400">ℹ️</span> The employee will be assigned to the selected manager. The manager must have a position assigned first. Only active managers with DEPARTMENT_HEAD role are shown.
+                    </div>
+                  </div>
                 </>
               )}
             </div>
